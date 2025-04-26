@@ -153,6 +153,6 @@ if prompt := st.chat_input("Digite sua dúvida ou reflexão..."):
 # --- Bloco 11: Rodapé ---
 # Atualizado para SophIA
 st.divider()
-st.caption("SophIA é uma ferramenta de IA para apoio teológico e espiritual. Ela não substitui o aconselhamento pastoral ou a comunhão da igreja local. Em caso de emergência ou necessidade de apoio para saúde mental, ligue para o CVV (188).")
+st.caption("SophIA é uma ferramenta de IA para apoio teológico e espiritual.")
 
 # --- Fim do app.py ---
