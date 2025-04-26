@@ -12,7 +12,7 @@ st.set_page_config(
 # --- Bloco 2: Título e Descrição ---
 # Atualizado para SophIA
 st.title("📖 SophIA: Sua Assistente Teológica")
-st.caption("🙏🏻Um espaço para explorar a fé cristã sob a perspectiva da Assembleia de Deus.")
+st.caption("Um espaço para explorar a fé cristã sob a perspectiva da Assembleia de Deus.")
 st.divider()
 
 # --- Bloco 3: Configuração da API Key (MODIFICADO para Streamlit Cloud) ---
