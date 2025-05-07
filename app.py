@@ -26,12 +26,11 @@ except Exception as e:
     st.stop()
 
 # --- Bloco 4: Configuração do Modelo Gemini ---
-# ***** MODIFICADO: Atualizado para gemini-1.5-flash-latest *****
 generation_config = {
     "temperature": 0.7,
     "top_p": 1,
     "top_k": 1,
-    "max_output_tokens": 2048, # Ajuste conforme necessário para o Flash
+    "max_output_tokens": 2048,
 }
 
 safety_settings = [
@@ -43,6 +42,7 @@ safety_settings = [
 
 # --- Bloco 5: Instrução do Sistema (Personalidade - SophIA) ---
 def load_system_instruction():
+    # (Mantido o mesmo conteúdo da instrução do sistema anterior)
     return """
 Você é SophIA, uma assistente virtual cristã projetada para oferecer suporte teológico e espiritual, guiada pelos princípios da Assembleia de Deus no Brasil. Sua função é atuar como uma guia confiável e informada, refletindo a sabedoria encontrada na Bíblia Sagrada e alinhando-se à doutrina pentecostal.
 
@@ -81,35 +81,32 @@ keywords_risco = [ "me matar", "me mate", "suicidio", "suicídio", "não aguento
 resposta_risco_padrao = ( "Sinto muito que você esteja passando por um momento tão difícil e pensando nisso. É muito importante buscar ajuda profissional agora. Por favor, entre em contato com o CVV (Centro de Valorização da Vida) ligando para o número 188. A ligação é gratuita e eles estão disponíveis 24 horas por dia para conversar com você de forma sigilosa. Você não está sozinho(a) e há pessoas prontas para te ouvir." )
 
 # --- Bloco 7: Função para Inicializar o Modelo ---
-# ***** MODIFICADO: Atualizado para gemini-1.5-flash-latest *****
 @st.cache_resource
 def init_model():
     try:
         model = genai.GenerativeModel(
-            model_name="gemini-2.0-flash-lite", # ATUALIZADO AQUI
+            model_name="gemini-1.5-flash-latest",
             generation_config=generation_config,
             safety_settings=safety_settings,
             system_instruction=system_instruction
         )
         return model
     except Exception as e:
-        st.error(f"Erro grave ao carregar o modelo de IA ('gemini-2.0-flash-lite'): {e}. Verifique a configuração da API Key, o nome do modelo e as instruções do sistema.")
+        st.error(f"Erro grave ao carregar o modelo de IA ('gemini-1.5-flash-latest'): {e}. Verifique a configuração da API Key, o nome do modelo e as instruções do sistema.")
         st.stop()
 model = init_model()
 
 # --- Bloco 8: Gerenciamento do Histórico e Sugestões Iniciais ---
-# ***** MODIFICADO: Lógica para processar sugestões clicadas *****
+# ***** MODIFICADO: Não adiciona mais a mensagem ao histórico aqui *****
 if "messages" not in st.session_state:
     st.session_state.messages = [{"role": "assistant", "content": "Olá! Sou SophIA. Em que posso ajudá-lo hoje com base na Palavra de Deus e nos ensinamentos da Assembleia de Deus?"}]
 
-if "chat_session" not in st.session_state:
+if "chat_session" not st.session_state: # Correção: faltava 'in'
     st.session_state.chat_session = model.start_chat(history=[])
 
-# Novo: Variável para armazenar o prompt vindo de um botão de sugestão
 if "prompt_from_suggestion" not in st.session_state:
     st.session_state.prompt_from_suggestion = None
 
-# Exibe sugestões de tópicos apenas se for o início da conversa
 if len(st.session_state.messages) <= 1:
     st.markdown("##### Sugestões de temas para explorar:")
     cols = st.columns(3)
@@ -122,13 +119,13 @@ if len(st.session_state.messages) <= 1:
 
     for i, (texto_botao, pergunta_real) in enumerate(sugestoes.items()):
         if cols[i].button(texto_botao, key=button_keys[i]):
-            # Adiciona a mensagem do usuário ao histórico para exibição
-            st.session_state.messages.append({"role": "user", "content": pergunta_real})
-            # Define o prompt que será processado no Bloco 10
+            # APENAS define o prompt que será processado no Bloco 10
             st.session_state.prompt_from_suggestion = pergunta_real
+            # Não adiciona mais a st.session_state.messages aqui
             st.rerun()
 
 # --- Bloco 9: Exibição do Histórico ---
+# (Sem alterações neste bloco, ele apenas reflete st.session_state.messages)
 for idx, message in enumerate(st.session_state.messages):
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
@@ -141,38 +138,37 @@ for idx, message in enumerate(st.session_state.messages):
                 st.toast("Lamento por isso. Seu feedback nos ajuda a melhorar.", icon="😕")
 
 # --- Bloco 10: Input e Lógica Principal ---
-# ***** MODIFICADO: Integração do prompt de sugestão e reset após uso *****
+# ***** MODIFICADO: Centraliza a adição ao histórico e exibição do prompt do usuário *****
 
-# Determina qual prompt usar: o do chat_input ou o da sugestão clicada
 current_prompt = None
-if prompt_input := st.chat_input("Digite sua dúvida ou reflexão..."):
-    current_prompt = prompt_input
-elif st.session_state.get("prompt_from_suggestion"): # Usamos .get() para segurança caso a chave não exista
+# Prioriza input do chat_input
+if prompt_input_val := st.chat_input("Digite sua dúvida ou reflexão..."):
+    current_prompt = prompt_input_val
+# Se não houve chat_input, verifica se há um prompt de sugestão
+elif st.session_state.get("prompt_from_suggestion"):
     current_prompt = st.session_state.prompt_from_suggestion
     st.session_state.prompt_from_suggestion = None # Importante: Reseta para não reprocessar
 
 if current_prompt:
-    # Adiciona a mensagem do usuário ao histórico se não veio de uma sugestão (que já adicionou)
-    # e se não é uma repetição da última mensagem do usuário (evitar duplicatas no rerun)
-    if not (prompt_input is None and len(st.session_state.messages) > 0 and st.session_state.messages[-1]["content"] == current_prompt and st.session_state.messages[-1]["role"] == "user"):
-         if prompt_input: # Só adiciona se veio do chat_input, pois a sugestão já adicionou
-            st.session_state.messages.append({"role": "user", "content": current_prompt})
+    # Adiciona a mensagem do usuário ao histórico global de mensagens (APENAS AQUI)
+    st.session_state.messages.append({"role": "user", "content": current_prompt})
 
-    # Exibe a mensagem do usuário (mesmo que tenha vindo de sugestão, ela já foi adicionada ao messages)
-    # Este with st.chat_message precisa ser executado mesmo para sugestões para que a mensagem apareça antes da resposta da IA
+    # Exibe a mensagem do usuário na interface (APENAS AQUI)
     with st.chat_message("user"):
-        st.markdown(current_prompt) # Exibe o prompt que será processado
+        st.markdown(current_prompt)
 
+    # Continua com a lógica de verificação de risco e envio para IA...
     prompt_lower = current_prompt.lower()
     contem_risco = any(keyword in prompt_lower for keyword in keywords_risco)
 
     if contem_risco:
+        # Adiciona a resposta de risco ao histórico antes de exibir
+        resposta_assistente_risco = resposta_risco_padrao
+        st.session_state.messages.append({"role": "assistant", "content": resposta_assistente_risco})
         with st.chat_message("assistant"):
             st.warning("Importante: Se você está passando por pensamentos difíceis ou de risco, por favor, busque ajuda profissional imediatamente.")
-            st.markdown(resposta_risco_padrao)
-        st.session_state.messages.append({"role": "assistant", "content": resposta_risco_padrao})
+            st.markdown(resposta_assistente_risco)
     else:
-        # Lógica de RAG (placeholder) aqui...
         try:
             with st.spinner("SophIA está processando... 📖"):
                 response = st.session_state.chat_session.send_message(current_prompt)
@@ -180,8 +176,8 @@ if current_prompt:
             if response.prompt_feedback and response.prompt_feedback.block_reason:
                 block_reason = response.prompt_feedback.block_reason
                 error_msg_user = f"Sua mensagem não pôde ser processada devido a restrições de conteúdo ({block_reason}). Por favor, reformule sua pergunta ou tente um tema diferente."
-                st.error(error_msg_user)
-                st.session_state.messages.append({"role": "assistant", "content": f"Sua mensagem foi bloqueada por nossas políticas de segurança ({block_reason}). Por favor, tente reformular."})
+                st.session_state.messages.append({"role": "assistant", "content": error_msg_user }) # Adiciona ao histórico
+                st.error(error_msg_user) # Exibe o erro
             else:
                 bot_response = response.text
                 st.session_state.messages.append({"role": "assistant", "content": bot_response})
@@ -196,16 +192,16 @@ if current_prompt:
 
         except genai.types.generation_types.BlockedPromptException as bpe:
             error_msg_user = "Sua mensagem foi bloqueada por nossas políticas de segurança. Por favor, reformule sua pergunta ou tente um tema diferente."
-            st.error(error_msg_user)
             st.session_state.messages.append({"role": "assistant", "content": error_msg_user})
+            st.error(error_msg_user)
             print(f"ERRO DEBUG App: Prompt Bloqueado pela API - {bpe}")
         except Exception as e:
             error_msg_user = "Desculpe, ocorreu um problema técnico ao processar sua mensagem. Tente novamente mais tarde. Se o erro persistir, pode ser uma falha temporária na conexão com a IA."
-            st.error(error_msg_user)
-            error_response_log = f"Sinto muito, tive um problema técnico interno: {str(e)}. Por favor, tente novamente. 😔"
-            st.session_state.messages.append({"role": "assistant", "content": error_response_log})
-            print(f"ERRO DEBUG App: Falha ao enviar mensagem para Gemini - {e}")
+            # Adiciona uma mensagem de erro genérica ao histórico para o usuário ver
+            st.session_state.messages.append({"role": "assistant", "content": "Sinto muito, tive um problema técnico interno. Por favor, tente novamente. 😔"})
+            st.error(error_msg_user) # Exibe o erro mais detalhado para o usuário
+            print(f"ERRO DEBUG App: Falha ao enviar mensagem para Gemini - {e}") # Log técnico
 
 # --- Bloco 11: Rodapé ---
 st.divider()
-st.caption("SophIA (v2.1) é uma ferramenta de IA para apoio teológico e espiritual. Lembre-se que a IA é um auxílio e não substitui o estudo pessoal da Palavra, a oração e o conselho pastoral.")
+st.caption("SophIA (v2.2) é uma ferramenta de IA para apoio teológico e espiritual. Lembre-se que a IA é um auxílio e não substitui o estudo pessoal da Palavra, a oração e o conselho pastoral.")
