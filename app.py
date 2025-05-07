@@ -7,7 +7,7 @@ import time
 # SUBSTITUA PELA URL PÚBLICA DA SUA IMAGEM DA SOPHIA
 # Exemplo: "https_://raw.githubusercontent.com/seu_usuario/seu_repo/main/sophia_logo.png"
 # Se não tiver uma URL pronta, pode usar um emoji como "📖" ou "🤖"
-ASSISTANT_AVATAR_URL = "https://github.com/Guhssantos/SophIA/blob/main/Logo%20SophIA%20-%20Copia.png?raw=true" # <<< COLOQUE A URL AQUI
+ASSISTANT_AVATAR_URL = "https://raw.githubusercontent.com/Guhssantos/SophIA/refs/heads/main/Icone%20SophIA.png" # <<< COLOQUE A URL AQUI
 
 # Se a URL acima não for uma URL válida de imagem, o Streamlit pode não mostrar nada
 # ou mostrar um ícone quebrado. Certifique-se que a URL está correta.
