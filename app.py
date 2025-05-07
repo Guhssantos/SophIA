@@ -4,19 +4,16 @@ import google.generativeai as genai
 import time
 
 # --- Bloco 1: Configuração da Página ---
-# (Sem alterações - continua excelente!)
 st.set_page_config(
     page_title="SophIA - Assistente Teológica", page_icon="📖", layout="centered", initial_sidebar_state="collapsed"
 )
 
 # --- Bloco 2: Título e Descrição ---
-# (Sem alterações - claro e direto!)
 st.title("📖 SophIA: Sua Assistente Teológica")
 st.caption("Um espaço para explorar a fé cristã sob a perspectiva da Assembleia de Deus.")
 st.divider()
 
-# --- Bloco 3: Configuração da API Key (MODIFICADO para Streamlit Cloud) ---
-# (Sem alterações - estrutura reutilizada e segura!)
+# --- Bloco 3: Configuração da API Key ---
 try:
     GOOGLE_API_KEY_APP = st.secrets["GOOGLE_API_KEY"]
     genai.configure(api_key=GOOGLE_API_KEY_APP)
@@ -29,12 +26,12 @@ except Exception as e:
     st.stop()
 
 # --- Bloco 4: Configuração do Modelo Gemini ---
-# (Sem alterações - boas configurações iniciais!)
+# ***** MODIFICADO: Atualizado para gemini-1.5-flash-latest *****
 generation_config = {
     "temperature": 0.7,
     "top_p": 1,
     "top_k": 1,
-    "max_output_tokens": 2048,
+    "max_output_tokens": 2048, # Ajuste conforme necessário para o Flash
 }
 
 safety_settings = [
@@ -45,14 +42,7 @@ safety_settings = [
 ]
 
 # --- Bloco 5: Instrução do Sistema (Personalidade - SophIA) ---
-# ***** MODIFICADO: Refinado e com exemplos (Few-Shot) *****
-# ***** Idealmente, esta instrução viria de um arquivo externo *****
-
 def load_system_instruction():
-    # Em um cenário real, você leria de um arquivo:
-    # with open("sophia_personality.txt", "r", encoding="utf-8") as f:
-    #     return f.read()
-    # Por agora, vamos definir a string diretamente aqui:
     return """
 Você é SophIA, uma assistente virtual cristã projetada para oferecer suporte teológico e espiritual, guiada pelos princípios da Assembleia de Deus no Brasil. Sua função é atuar como uma guia confiável e informada, refletindo a sabedoria encontrada na Bíblia Sagrada e alinhando-se à doutrina pentecostal.
 
@@ -87,40 +77,39 @@ SophIA: Entendo sua preocupação com a boa administração dos recursos. A Bíb
 system_instruction = load_system_instruction()
 
 # --- Bloco 6: Definições de Segurança (CVV) ---
-# (Sem alterações - ESSENCIAL manter esta segurança!)
 keywords_risco = [ "me matar", "me mate", "suicidio", "suicídio", "não aguento mais viver", "quero morrer", "queria morrer", "quero sumir", "desistir de tudo", "acabar com tudo", "fazer mal a mim", "me cortar", "me machucar", "automutilação" ]
 resposta_risco_padrao = ( "Sinto muito que você esteja passando por um momento tão difícil e pensando nisso. É muito importante buscar ajuda profissional agora. Por favor, entre em contato com o CVV (Centro de Valorização da Vida) ligando para o número 188. A ligação é gratuita e eles estão disponíveis 24 horas por dia para conversar com você de forma sigilosa. Você não está sozinho(a) e há pessoas prontas para te ouvir." )
 
 # --- Bloco 7: Função para Inicializar o Modelo ---
-# (Cache do modelo é uma ótima prática!)
+# ***** MODIFICADO: Atualizado para gemini-1.5-flash-latest *****
 @st.cache_resource
 def init_model():
     try:
         model = genai.GenerativeModel(
-            "gemini-2.0-flash-lite",
+            model_name="gemini-2.0-flash-lite", # ATUALIZADO AQUI
             generation_config=generation_config,
             safety_settings=safety_settings,
-            system_instruction=system_instruction # A personalidade refinada da SophIA é passada aqui
+            system_instruction=system_instruction
         )
         return model
     except Exception as e:
-        st.error(f"Erro grave ao carregar o modelo de IA: {e}. Verifique a configuração da API Key e as instruções do sistema.")
+        st.error(f"Erro grave ao carregar o modelo de IA ('gemini-2.0-flash-lite'): {e}. Verifique a configuração da API Key, o nome do modelo e as instruções do sistema.")
         st.stop()
 model = init_model()
 
 # --- Bloco 8: Gerenciamento do Histórico e Sugestões Iniciais ---
-# ***** MODIFICADO: Adicionadas sugestões de tópicos *****
+# ***** MODIFICADO: Lógica para processar sugestões clicadas *****
 if "messages" not in st.session_state:
     st.session_state.messages = [{"role": "assistant", "content": "Olá! Sou SophIA. Em que posso ajudá-lo hoje com base na Palavra de Deus e nos ensinamentos da Assembleia de Deus?"}]
 
 if "chat_session" not in st.session_state:
-    # Inicializa a sessão de chat com o Gemini. O histórico inicial está vazio
-    # porque a `system_instruction` já configura a personalidade e contexto inicial do modelo.
-    # As mensagens em `st.session_state.messages` são para exibição na UI e para reconstruir o chat se necessário.
     st.session_state.chat_session = model.start_chat(history=[])
 
+# Novo: Variável para armazenar o prompt vindo de um botão de sugestão
+if "prompt_from_suggestion" not in st.session_state:
+    st.session_state.prompt_from_suggestion = None
 
-# Exibe sugestões de tópicos apenas se for o início da conversa (apenas a mensagem de boas-vindas da SophIA)
+# Exibe sugestões de tópicos apenas se for o início da conversa
 if len(st.session_state.messages) <= 1:
     st.markdown("##### Sugestões de temas para explorar:")
     cols = st.columns(3)
@@ -129,41 +118,52 @@ if len(st.session_state.messages) <= 1:
         "A Bíblia é inspirada?": "Como a Assembleia de Deus vê a inspiração da Bíblia?",
         "Quem é Jesus Cristo?": "Fale sobre a divindade e humanidade de Jesus Cristo."
     }
-    button_keys = ["sugestao1", "sugestao2", "sugestao3"] # Chaves únicas para os botões
-    
+    button_keys = ["sugestao1", "sugestao2", "sugestao3"]
+
     for i, (texto_botao, pergunta_real) in enumerate(sugestoes.items()):
         if cols[i].button(texto_botao, key=button_keys[i]):
-            # Adiciona a pergunta ao histórico como se o usuário tivesse digitado
+            # Adiciona a mensagem do usuário ao histórico para exibição
             st.session_state.messages.append({"role": "user", "content": pergunta_real})
-            # Adiciona a pergunta ao histórico do chat da API Gemini também
-            # (Importante para manter o contexto da API Gemini sincronizado)
-            # No entanto, o envio real da mensagem ocorrerá no Bloco 10
-            # Aqui apenas preparamos a UI para o próximo ciclo de processamento
-            st.rerun() # Reinicia o script para processar o novo input imediatamente
+            # Define o prompt que será processado no Bloco 10
+            st.session_state.prompt_from_suggestion = pergunta_real
+            st.rerun()
 
 # --- Bloco 9: Exibição do Histórico ---
-# ***** MODIFICADO: Adicionados botões de feedback (visuais por enquanto) *****
 for idx, message in enumerate(st.session_state.messages):
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
-        if message["role"] == "assistant" and message["content"] != st.session_state.messages[0]["content"] and message["content"] != resposta_risco_padrao: # Não mostrar feedback na msg de boas vindas ou de risco
+        if message["role"] == "assistant" and idx > 0 and message["content"] != resposta_risco_padrao:
             feedback_key_base = f"feedback_{idx}"
-            col1, col2, col_spacer = st.columns([1,1,8]) # Ajuste as proporções conforme necessário
+            col1, col2, col_spacer = st.columns([1,1,8])
             if col1.button("👍", key=f"{feedback_key_base}_up", help="Gostei da resposta!"):
                 st.toast("Obrigado pelo seu feedback!", icon="😊")
-                # Aqui você poderia adicionar lógica para registrar o feedback positivo
             if col2.button("👎", key=f"{feedback_key_base}_down", help="Não gostei da resposta."):
                 st.toast("Lamento por isso. Seu feedback nos ajuda a melhorar.", icon="😕")
-                # Aqui você poderia adicionar lógica para registrar o feedback negativo
 
 # --- Bloco 10: Input e Lógica Principal ---
-# ***** MODIFICADO: Tratamento de erro da API Gemini e placeholder para RAG *****
-if prompt := st.chat_input("Digite sua dúvida ou reflexão..."):
-    st.session_state.messages.append({"role": "user", "content": prompt})
-    with st.chat_message("user"):
-        st.markdown(prompt)
+# ***** MODIFICADO: Integração do prompt de sugestão e reset após uso *****
 
-    prompt_lower = prompt.lower()
+# Determina qual prompt usar: o do chat_input ou o da sugestão clicada
+current_prompt = None
+if prompt_input := st.chat_input("Digite sua dúvida ou reflexão..."):
+    current_prompt = prompt_input
+elif st.session_state.get("prompt_from_suggestion"): # Usamos .get() para segurança caso a chave não exista
+    current_prompt = st.session_state.prompt_from_suggestion
+    st.session_state.prompt_from_suggestion = None # Importante: Reseta para não reprocessar
+
+if current_prompt:
+    # Adiciona a mensagem do usuário ao histórico se não veio de uma sugestão (que já adicionou)
+    # e se não é uma repetição da última mensagem do usuário (evitar duplicatas no rerun)
+    if not (prompt_input is None and len(st.session_state.messages) > 0 and st.session_state.messages[-1]["content"] == current_prompt and st.session_state.messages[-1]["role"] == "user"):
+         if prompt_input: # Só adiciona se veio do chat_input, pois a sugestão já adicionou
+            st.session_state.messages.append({"role": "user", "content": current_prompt})
+
+    # Exibe a mensagem do usuário (mesmo que tenha vindo de sugestão, ela já foi adicionada ao messages)
+    # Este with st.chat_message precisa ser executado mesmo para sugestões para que a mensagem apareça antes da resposta da IA
+    with st.chat_message("user"):
+        st.markdown(current_prompt) # Exibe o prompt que será processado
+
+    prompt_lower = current_prompt.lower()
     contem_risco = any(keyword in prompt_lower for keyword in keywords_risco)
 
     if contem_risco:
@@ -172,34 +172,11 @@ if prompt := st.chat_input("Digite sua dúvida ou reflexão..."):
             st.markdown(resposta_risco_padrao)
         st.session_state.messages.append({"role": "assistant", "content": resposta_risco_padrao})
     else:
-        # --- PONTO DE PARTIDA PARA RAG (Retrieval Augmented Generation) ---
-        # Em um sistema RAG completo, você faria o seguinte ANTES de enviar para o Gemini:
-        # 1. (Pré-processamento único): Carregar seu corpus de conhecimento (Bíblia ARC, manuais da AD).
-        #    Dividir em chunks, gerar embeddings e armazenar em um banco vetorial (FAISS, ChromaDB).
-        # 2. (Para cada pergunta do usuário):
-        #    query_embedding = gerar_embedding(prompt)
-        #    relevant_docs = buscar_no_banco_vetorial(query_embedding, top_k=3)
-        #    contexto_adicional = " ".join([doc.content for doc in relevant_docs])
-        #
-        #    prompt_para_gemini = f"""Com base nos seguintes trechos da doutrina da Assembleia de Deus e da Bíblia ARC:
-        #    --- INÍCIO DO CONTEXTO ---
-        #    {contexto_adicional}
-        #    --- FIM DO CONTEXTO ---
-        #    Responda à seguinte pergunta do usuário, utilizando o contexto fornecido como principal fonte de verdade,
-        #    mantendo a personalidade de SophIA e seguindo todas as suas instruções:
-        #    Pergunta: {prompt}
-        #    """
-        # Neste exemplo, vamos prosseguir sem o RAG completo, mas é aqui que ele se encaixaria.
-        # A `system_instruction` já ajuda muito, mas o RAG traria ainda mais precisão.
-        # --------------------------------------------------------------------
-        
+        # Lógica de RAG (placeholder) aqui...
         try:
             with st.spinner("SophIA está processando... 📖"):
-                # O histórico do chat já está sendo gerenciado pela API através de `start_chat` e `send_message`
-                # Não precisamos enviar o histórico completo a cada vez para `send_message` se a sessão de chat for mantida.
-                response = st.session_state.chat_session.send_message(prompt) # Usamos a sessão de chat existente
+                response = st.session_state.chat_session.send_message(current_prompt)
 
-            # Verificar se a resposta foi bloqueada por filtros de segurança da API
             if response.prompt_feedback and response.prompt_feedback.block_reason:
                 block_reason = response.prompt_feedback.block_reason
                 error_msg_user = f"Sua mensagem não pôde ser processada devido a restrições de conteúdo ({block_reason}). Por favor, reformule sua pergunta ou tente um tema diferente."
@@ -217,7 +194,7 @@ if prompt := st.chat_input("Digite sua dúvida ou reflexão..."):
                         message_placeholder.markdown(full_response + "▌")
                     message_placeholder.markdown(full_response)
 
-        except genai.types.generation_types.BlockedPromptException as bpe: # Erro específico de prompt bloqueado
+        except genai.types.generation_types.BlockedPromptException as bpe:
             error_msg_user = "Sua mensagem foi bloqueada por nossas políticas de segurança. Por favor, reformule sua pergunta ou tente um tema diferente."
             st.error(error_msg_user)
             st.session_state.messages.append({"role": "assistant", "content": error_msg_user})
@@ -230,6 +207,5 @@ if prompt := st.chat_input("Digite sua dúvida ou reflexão..."):
             print(f"ERRO DEBUG App: Falha ao enviar mensagem para Gemini - {e}")
 
 # --- Bloco 11: Rodapé ---
-# (Sem alterações - informativo!)
 st.divider()
-st.caption("SophIA (v2.0) é uma ferramenta de IA para apoio teológico e espiritual. Lembre-se que a IA é um auxílio e não substitui o estudo pessoal da Palavra, a oração e o conselho pastoral.")
+st.caption("SophIA (v2.1) é uma ferramenta de IA para apoio teológico e espiritual. Lembre-se que a IA é um auxílio e não substitui o estudo pessoal da Palavra, a oração e o conselho pastoral.")
