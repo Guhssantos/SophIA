@@ -3,6 +3,18 @@ import streamlit as st
 import google.generativeai as genai
 import time
 
+# --- Bloco 0: Configuração do Avatar da Assistente ---
+# SUBSTITUA PELA URL PÚBLICA DA SUA IMAGEM DA SOPHIA
+# Exemplo: "https_://raw.githubusercontent.com/seu_usuario/seu_repo/main/sophia_logo.png"
+# Se não tiver uma URL pronta, pode usar um emoji como "📖" ou "🤖"
+ASSISTANT_AVATAR_URL = "https://github.com/Guhssantos/SophIA/blob/main/Logo%20SophIA.png" # <<< COLOQUE A URL AQUI
+
+# Se a URL acima não for uma URL válida de imagem, o Streamlit pode não mostrar nada
+# ou mostrar um ícone quebrado. Certifique-se que a URL está correta.
+# Para testar sem uma URL, você pode comentar a linha acima e descomentar a de baixo:
+# ASSISTANT_AVATAR_URL = "📖"
+
+
 # --- Bloco 1: Configuração da Página ---
 st.set_page_config(
     page_title="SophIA - Assistente Teológica", page_icon="📖", layout="centered", initial_sidebar_state="collapsed"
@@ -97,17 +109,17 @@ def init_model():
 model = init_model()
 
 # --- Bloco 8: Gerenciamento do Histórico e Sugestões Iniciais ---
+# ***** MODIFICADO: A mensagem inicial já será exibida com avatar pelo Bloco 9 *****
 if "messages" not in st.session_state:
     st.session_state.messages = [{"role": "assistant", "content": "Olá! Sou SophIA. Em que posso ajudá-lo hoje com base na Palavra de Deus e nos ensinamentos da Assembleia de Deus?"}]
 
-# ***** CORRIGIDO O ERRO DE SINTAXE AQUI *****
 if "chat_session" not in st.session_state:
     st.session_state.chat_session = model.start_chat(history=[])
 
 if "prompt_from_suggestion" not in st.session_state:
     st.session_state.prompt_from_suggestion = None
 
-if len(st.session_state.messages) <= 1:
+if len(st.session_state.messages) <= 1: # Mostra sugestões apenas se houver só a msg de boas-vindas
     st.markdown("##### Sugestões de temas para explorar:")
     cols = st.columns(3)
     sugestoes = {
@@ -123,10 +135,19 @@ if len(st.session_state.messages) <= 1:
             st.rerun()
 
 # --- Bloco 9: Exibição do Histórico ---
+# ***** MODIFICADO: Adiciona avatar para mensagens da assistente *****
 for idx, message in enumerate(st.session_state.messages):
-    with st.chat_message(message["role"]):
+    role = message["role"]
+    # Define o avatar apropriado
+    if role == "assistant":
+        current_avatar = ASSISTANT_AVATAR_URL
+    else: # Para o usuário, o Streamlit usa um avatar padrão ou pode ser None
+        current_avatar = None # Ou "🧑‍💻", "👤" se quiser um emoji para o usuário
+
+    with st.chat_message(role, avatar=current_avatar):
         st.markdown(message["content"])
-        if message["role"] == "assistant" and idx > 0 and message["content"] != resposta_risco_padrao:
+        # Feedback apenas para respostas da assistente (e não a primeira mensagem)
+        if role == "assistant" and idx > 0 and message["content"] != resposta_risco_padrao:
             feedback_key_base = f"feedback_{idx}"
             col1, col2, col_spacer = st.columns([1,1,8])
             if col1.button("👍", key=f"{feedback_key_base}_up", help="Gostei da resposta!"):
@@ -135,6 +156,8 @@ for idx, message in enumerate(st.session_state.messages):
                 st.toast("Lamento por isso. Seu feedback nos ajuda a melhorar.", icon="😕")
 
 # --- Bloco 10: Input e Lógica Principal ---
+# ***** MODIFICADO: Usa avatar nas exibições imediatas da assistente *****
+
 current_prompt = None
 if prompt_input_val := st.chat_input("Digite sua dúvida ou reflexão..."):
     current_prompt = prompt_input_val
@@ -144,6 +167,7 @@ elif st.session_state.get("prompt_from_suggestion"):
 
 if current_prompt:
     st.session_state.messages.append({"role": "user", "content": current_prompt})
+    # Exibe a mensagem do usuário (sem avatar personalizado aqui, Streamlit usa o padrão)
     with st.chat_message("user"):
         st.markdown(current_prompt)
 
@@ -153,7 +177,8 @@ if current_prompt:
     if contem_risco:
         resposta_assistente_risco = resposta_risco_padrao
         st.session_state.messages.append({"role": "assistant", "content": resposta_assistente_risco})
-        with st.chat_message("assistant"):
+        # Exibe a mensagem de risco imediatamente com avatar
+        with st.chat_message("assistant", avatar=ASSISTANT_AVATAR_URL):
             st.warning("Importante: Se você está passando por pensamentos difíceis ou de risco, por favor, busque ajuda profissional imediatamente.")
             st.markdown(resposta_assistente_risco)
     else:
@@ -165,11 +190,13 @@ if current_prompt:
                 block_reason = response.prompt_feedback.block_reason
                 error_msg_user = f"Sua mensagem não pôde ser processada devido a restrições de conteúdo ({block_reason}). Por favor, reformule sua pergunta ou tente um tema diferente."
                 st.session_state.messages.append({"role": "assistant", "content": error_msg_user })
+                # O st.error não usa avatar de chat. A mensagem adicionada ao histórico será exibida com avatar pelo Bloco 9.
                 st.error(error_msg_user)
             else:
                 bot_response = response.text
                 st.session_state.messages.append({"role": "assistant", "content": bot_response})
-                with st.chat_message("assistant"):
+                # Exibe a resposta da IA imediatamente com avatar
+                with st.chat_message("assistant", avatar=ASSISTANT_AVATAR_URL):
                     message_placeholder = st.empty()
                     full_response = ""
                     for chunk in bot_response.split():
@@ -181,14 +208,17 @@ if current_prompt:
         except genai.types.generation_types.BlockedPromptException as bpe:
             error_msg_user = "Sua mensagem foi bloqueada por nossas políticas de segurança. Por favor, reformule sua pergunta ou tente um tema diferente."
             st.session_state.messages.append({"role": "assistant", "content": error_msg_user})
+            # O st.error não usa avatar de chat. A mensagem adicionada ao histórico será exibida com avatar pelo Bloco 9.
             st.error(error_msg_user)
             print(f"ERRO DEBUG App: Prompt Bloqueado pela API - {bpe}")
         except Exception as e:
             error_msg_user = "Desculpe, ocorreu um problema técnico ao processar sua mensagem. Tente novamente mais tarde. Se o erro persistir, pode ser uma falha temporária na conexão com a IA."
-            st.session_state.messages.append({"role": "assistant", "content": "Sinto muito, tive um problema técnico interno. Por favor, tente novamente. 😔"})
+            msg_para_histórico = "Sinto muito, tive um problema técnico interno. Por favor, tente novamente. 😔"
+            st.session_state.messages.append({"role": "assistant", "content": msg_para_histórico})
+            # O st.error não usa avatar de chat. A mensagem adicionada ao histórico será exibida com avatar pelo Bloco 9.
             st.error(error_msg_user)
             print(f"ERRO DEBUG App: Falha ao enviar mensagem para Gemini - {e}")
 
 # --- Bloco 11: Rodapé ---
 st.divider()
-st.caption("SophIA (v2.3) é uma ferramenta de IA para apoio teológico e espiritual. Lembre-se que a IA é um auxílio e não substitui o estudo pessoal da Palavra, a oração e o conselho pastoral.")
+st.caption("SophIA (v2.4) é uma ferramenta de IA para apoio teológico e espiritual. Lembre-se que a IA é um auxílio e não substitui o estudo pessoal da Palavra, a oração e o conselho pastoral.")
