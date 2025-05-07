@@ -85,14 +85,14 @@ resposta_risco_padrao = ( "Sinto muito que você esteja passando por um momento 
 def init_model():
     try:
         model = genai.GenerativeModel(
-            model_name="gemini-1.5-flash-latest",
+            model_name="gemini-2.0-flash-lite",
             generation_config=generation_config,
             safety_settings=safety_settings,
             system_instruction=system_instruction
         )
         return model
     except Exception as e:
-        st.error(f"Erro grave ao carregar o modelo de IA ('gemini-1.5-flash-latest'): {e}. Verifique a configuração da API Key, o nome do modelo e as instruções do sistema.")
+        st.error(f"Erro grave ao carregar o modelo de IA ('gemini-2.0-flash-lite'): {e}. Verifique a configuração da API Key, o nome do modelo e as instruções do sistema.")
         st.stop()
 model = init_model()
 
